@@ -14,8 +14,7 @@ def run_circuit_once(circuit: QuantumCircuit):
         String: bitstring measured (little-endian)
     """
     simulator = AerSimulator()
-    compiled = transpile(circuit, simulator)
-    job = simulator.run(compiled, shots=1)
+    job = simulator.run(circuit, shots=1)
     counts = job.result().get_counts()
 
     return list(counts.keys())[0]
