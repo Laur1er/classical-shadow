@@ -15,8 +15,8 @@ def bell_shadow():
     bell.h(0)
     bell.cx(0, 1)
 
-    shadow = LocalClassicalShadow()
-    shadow.collect_data(bell, 10000)
+    shadow = LocalClassicalShadow(num_snapshots=10000)
+    shadow.create_shadow(bell)
     return bell, shadow
 
 
@@ -38,7 +38,7 @@ def test_bell_state(bell_shadow, observable: SparsePauliOp):
     assert np.abs(real_expect_value - expect_value) < 0.1
 
 
-### Voir avec circuit generer aleatoirement
+### Voir avec plus gros circuit
 
 
 @pytest.fixture(scope="module")
@@ -51,8 +51,8 @@ def weird_state():
     state.sdg([2, 5, 6, 4])
     state.y([7, 8])
 
-    shadow = LocalClassicalShadow()
-    shadow.collect_data(state, 20000)
+    shadow = LocalClassicalShadow(num_snapshots=20000)
+    shadow.create_shadow(state)
 
     return state, shadow
 
@@ -61,9 +61,10 @@ def weird_state():
     "local_observable",
     [
         SparsePauliOp(["IYIIIIIIII", "IIIYIIYIII"], [0.3, -1]),
-        SparsePauliOp(["IIIIIXIIII", "IIIIIIXIII"], [1, -2]),
+        SparsePauliOp(["IIIYIXIIII", "IIIIIIXIII"], [1, -2]),
         SparsePauliOp(["ZIIIIIIIII", "IIIZIXIIII"], [-0.7, -0.5]),
         SparsePauliOp(["IYIIZIIIII", "IIIZIIIIIZ"], [0.3, 0.75]),
+        SparsePauliOp(["ZIIIIIIIIZ", "IIIIZZIIII", "IIYIIIXIII"], [-1.2, 3.4, 0.7]),
     ],
 )
 def test_random_state(weird_state, local_observable: SparsePauliOp):

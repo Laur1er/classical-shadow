@@ -1,3 +1,5 @@
+from typing import Union
+
 import numpy as np
 from numpy import ndarray
 
@@ -12,27 +14,75 @@ class LocalClassicalShadow:
     This is an implementation of local classical shadows.
     """
 
-    # Attributs principaux de la classical shadow Local
-    measures: ndarray
-    measures_basis: ndarray
+    NUM_BLOC = 10
 
-    # Attributs de precision
-    n_snapshots: int
+    def __init__(
+        self,
+        num_snapshots: int | None = None,
+        error_margin: float | None = None,
+        precision: float | None = None,
+    ) -> None:
+        """
+        Constructor for a LocalClassicalShadow.
+        """
+        # Declaration des attributs du shadow
+        self.measures: ndarray
+        self.measures_basis: ndarray
+        self.n_snapshots = None
+        self.num_qubits: int
 
-    PRECISION = 0.05
-    FAILIURE_TOLARATED = 0.05
+        self.NUM_ACTIVE_QUBITS = 5
+        self.NUM_OBSERVABLES = 5
+        self.ERROR_MARGIN = 0.05
+        self.PRECISION = 0.05
 
-    def __init__(self):
+        if error_margin is not None:
+            self.ERROR_MARGIN = error_margin
 
-        pass
+        if precision is not None:
+            self.PRECISION = precision
 
-    def collect_data(self, quantum_state: QuantumCircuit, n_snapshots) -> bool:
+        if num_snapshots is not None:
+            self.n_snapshots = num_snapshots
+
+    def computes_necessary_snapshots(self):
+        """
+        Computes the number of snapshot needed if number of active qubits (k) and observable (M) is 3 based on the formula:
+            N = 3**(k+1)/ ERROR_MARGIN**2 * log2(2M/PRECISION)
+        """
+        N = np.ceil(
+            (3 ** (self.NUM_ACTIVE_QUBITS + 1))
+            / self.ERROR_MARGIN**2
+            * np.log2(2 * self.NUM_OBSERVABLES / self.PRECISION)
+        )
+        self.n_snapshots = int(N - (N % self.NUM_BLOC))
+
+    def create_shadow(
+        self, quantum_state: QuantumCircuit, observable: SparsePauliOp | None = None
+    ) -> bool:
         """
         This fonction uses Shadow Local to produce the shadow of a quantum state.
         """
-        # Choose pauli strings randomly
+        # Si les observables sont fourni, on peut calculer le nombre de snapshots necessaire.
+        if observable is not None:
+            if isinstance(observable, SparsePauliOp):
+                self.NUM_OBSERVABLES = len(observable.paulis)
+
+                self.NUM_ACTIVE_QUBITS = np.max(
+                    np.sum(
+                        np.logical_or(observable.paulis.x, observable.paulis.z), axis=-1
+                    )
+                )
+
+        if self.n_snapshots is None:
+
+            self.computes_necessary_snapshots()
+
+        self.num_qubits = quantum_state.num_qubits
+
+        # Debut du protocole pour le faire le shadow.
         bases = np.random.choice(
-            ["X", "Y", "Z"], size=(n_snapshots, quantum_state.num_qubits)
+            ["X", "Y", "Z"], size=(self.n_snapshots, quantum_state.num_qubits)
         )
         pauli_strings = np.array(["".join(row) for row in bases])
         paulis = PauliList(pauli_strings)
@@ -59,12 +109,21 @@ class LocalClassicalShadow:
 
         return True
 
-    def estimate_observable(self, observable: SparsePauliOp):
+    def estimate_observable(self, observable: SparsePauliOp) -> complex:
         """
-        Estimate an observable given.
+        Estimate an observable given. The shadow must already be computated using the method create_shadow().
         """
-        estimation_value = 0
+        if self.measures is None:
+            raise ValueError(
+                "Call create_shadow(QuantumCircuit) before the estimation to create the local classical shadow."
+            )
 
+        if self.num_qubits != observable.num_qubits:
+            raise ValueError(
+                "The number of qubits in the observable is not the same as the number of qubits in the shadow."
+            )
+
+        estimation_value = 0
         for i, pauli in enumerate(observable.paulis):
             estimation_value += observable.coeffs[
                 i
@@ -72,9 +131,9 @@ class LocalClassicalShadow:
 
         return estimation_value
 
-    def estimate_pauli_expectation_value(self, pauli: Pauli):
+    def estimate_pauli_expectation_value(self, pauli: Pauli) -> complex:
         """
-        Fonction to predict expectation value of a single Pauli operator.
+        Fonction to predict expectation value of a single Pauli operator using the classical shadow.
         """
         # Sortir les qubits actif et leur base
         pos_active_qubits = (
@@ -97,7 +156,7 @@ class LocalClassicalShadow:
         scores[coresponding_snapshots] *= (-1) ** np.mod(
             np.sum(
                 self.measures[np.ix_(coresponding_snapshots, pos_active_qubits)].astype(
-                    np.int32
+                    int
                 ),
                 axis=1,
                 dtype=np.int32,
@@ -107,8 +166,7 @@ class LocalClassicalShadow:
 
         # Median-of-Means
         # Comment calculer le nombre de blocs? ca doit dependre du nombre de snapshots
-        num_blocs = 10
-        blocs = np.array_split(scores, num_blocs)
+        blocs = np.array_split(scores, self.NUM_BLOC)
         moyennes_blocs = [np.mean(b) for b in blocs]
 
         return np.median(moyennes_blocs)
