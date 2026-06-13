@@ -1,15 +1,13 @@
-from typing import Union
-
 import numpy as np
-from numpy import ndarray
 
 from qiskit.circuit import QuantumCircuit
 from qiskit.quantum_info import Pauli, PauliList, SparsePauliOp
 
+from classical_shadow.base_shadow import BaseClassicalShadow
 from classical_shadow.utils import run_circuit_once
 
 
-class LocalClassicalShadow:
+class LocalClassicalShadow(BaseClassicalShadow):
     """
     This is an implementation of local classical shadows.
     """
@@ -19,56 +17,65 @@ class LocalClassicalShadow:
     def __init__(
         self,
         num_snapshots: int | None = None,
-        error_margin: float | None = None,
-        precision: float | None = None,
+        error_margin: float | None = 0.05,
+        precision: float | None = 0.05,
+        num_active_qubits: int = 5,
+        num_observable: int = 5,
     ) -> None:
-        """
-        Constructor for a LocalClassicalShadow.
-        """
-        # Declaration des attributs du shadow
-        self.measures: ndarray
-        self.measures_basis: ndarray
-        self.n_snapshots = None
-        self.num_qubits: int
 
-        self.NUM_ACTIVE_QUBITS = 5
-        self.NUM_OBSERVABLES = 5
-        self.ERROR_MARGIN = 0.05
-        self.PRECISION = 0.05
+        self.num_active_qubits = num_active_qubits
+        self.num_observables = num_observable
+        self.n_snapshots = num_snapshots
 
-        if error_margin is not None:
-            self.ERROR_MARGIN = error_margin
+        if not (0 < error_margin < 1):
+            raise ValueError(
+                f"error_margin must stand between 0 et 1, given : {error_margin}"
+            )
+        self.error_margin = error_margin
 
-        if precision is not None:
-            self.PRECISION = precision
+        if not (0 < precision < 1):
+            raise ValueError(
+                f"precision must stand between 0 et 1, given : {precision}"
+            )
+        self.precision = precision
 
-        if num_snapshots is not None:
-            self.n_snapshots = num_snapshots
+        self.measures: np.ndarray | None = None
+        self.measures_basis: np.ndarray | None = None
+        self.num_qubits: int | None = None
 
-    def computes_necessary_snapshots(self):
+    @property
+    def n_snapshots(self) -> int | None:
+        return self._n_snapshots
+
+    @n_snapshots.setter
+    def n_snapshots(self, value: int | None) -> None:
+        if value is not None and value <= 0:
+            raise ValueError("n_snapshots must be positive")
+        self._n_snapshots = value
+
+    def _compute_num_snapshots(self):
         """
         Computes the number of snapshot needed if number of active qubits (k) and observable (M) is 3 based on the formula:
-            N = 3**(k+1)/ ERROR_MARGIN**2 * log2(2M/PRECISION)
+            N = 3**(k+1)/ error_margin**2 * log2(2M/precision)
         """
         N = np.ceil(
-            (3 ** (self.NUM_ACTIVE_QUBITS + 1))
-            / self.ERROR_MARGIN**2
-            * np.log2(2 * self.NUM_OBSERVABLES / self.PRECISION)
+            (3 ** (self.num_active_qubits + 1))
+            * np.log2(2 * self.num_observables / self.precision)
+            / self.error_margin**2
         )
         self.n_snapshots = int(N - (N % self.NUM_BLOC))
 
-    def create_shadow(
+    def fit_shadow(
         self, quantum_state: QuantumCircuit, observable: SparsePauliOp | None = None
     ) -> bool:
         """
         This fonction uses Shadow Local to produce the shadow of a quantum state.
         """
-        # Si les observables sont fourni, on peut calculer le nombre de snapshots necessaire.
         if observable is not None:
             if isinstance(observable, SparsePauliOp):
-                self.NUM_OBSERVABLES = len(observable.paulis)
+                self.num_observables = len(observable.paulis)
 
-                self.NUM_ACTIVE_QUBITS = np.max(
+                self.num_active_qubits = np.max(
                     np.sum(
                         np.logical_or(observable.paulis.x, observable.paulis.z), axis=-1
                     )
@@ -76,11 +83,17 @@ class LocalClassicalShadow:
 
         if self.n_snapshots is None:
 
-            self.computes_necessary_snapshots()
+            self._compute_num_snapshots()
 
         self.num_qubits = quantum_state.num_qubits
 
-        # Debut du protocole pour le faire le shadow.
+        if self.n_snapshots > 50000:
+            yesno = input(
+                f"You are about to make a shadow of {self.n_snapshots} snapshots, do you want to proceed? (Y/N)"
+            )
+            if "N" in yesno:
+                return False
+
         bases = np.random.choice(
             ["X", "Y", "Z"], size=(self.n_snapshots, quantum_state.num_qubits)
         )
@@ -92,7 +105,6 @@ class LocalClassicalShadow:
 
             circuit = quantum_state.copy()
 
-            # Diagonalize the pauli
             where_y = np.nonzero(np.logical_and(pauli.x, pauli.z))[0]
             where_x = np.nonzero(pauli.x)[0]
             if len(where_y) > 0:
@@ -101,7 +113,6 @@ class LocalClassicalShadow:
                 circuit.h(where_x)
             circuit.measure_all()
 
-            # Simulate and store the result in measures
             measures.append(list(run_circuit_once(circuit)))
 
         self.measures_basis = bases
@@ -111,11 +122,11 @@ class LocalClassicalShadow:
 
     def estimate_observable(self, observable: SparsePauliOp) -> complex:
         """
-        Estimate an observable given. The shadow must already be computated using the method create_shadow().
+        Estimate an observable given. The shadow must already be computated using the method fit_shadow().
         """
         if self.measures is None:
             raise ValueError(
-                "Call create_shadow(QuantumCircuit) before the estimation to create the local classical shadow."
+                "Call fit_shadow(QuantumCircuit) before the estimation to create the local classical shadow."
             )
 
         if self.num_qubits != observable.num_qubits:
