@@ -7,49 +7,101 @@ from qiskit.quantum_info import SparsePauliOp, Pauli
 
 class BaseClassicalShadow(ABC):
     """
-    OK
-    """
+    Abstract base class for Classical Shadow implementations.
 
-    NUM_BLOC = 10
+    Classical Shadows is an efficient quantum tomography technique that allows estimating expectation values of observables
+    from a reduced number of random measurements of a quantum state.
+
+    The general procedure consists of:
+
+        1. Applying random unitaries to the quantum state.
+        2. Measuring in the computational basis.
+        3. Building a classical "shadow" from the measurement outcomes.
+
+    Subclasses must implement:
+
+        - :meth:`fit_shadow` : construction of the classical shadow.
+        - :meth:`estimate_pauli_expectation_value` : estimation of a Pauli operator.
+
+    Attributes:
+
+        n_snapshots (int): Number of snapshots (measurements) to perform.
+        measures (np.ndarray): Array of recorded measurements after calling :meth:`fit_shadow`. Is None before that call.
+
+    """
 
     def __init__(
         self,
-        num_snapshots: int | None = None,
-        error_margin: float | None = 0.05,
-        precision: float | None = 0.05,
-        num_active_qubits: int = 5,
-        num_observable: int = 5,
+        nb_snapshots: int,
     ) -> None:
-
-        self.num_active_qubits = num_active_qubits
-        self.num_observables = num_observable
-        self.n_snapshots = num_snapshots
-
-        if not (0 < error_margin < 1):
-            raise ValueError(
-                f"error_margin must stand between 0 et 1, given : {error_margin}"
-            )
-        self.error_margin = error_margin
-
-        if not (0 < precision < 1):
-            raise ValueError(
-                f"precision must stand between 0 et 1, given : {precision}"
-            )
-        self.precision = precision
-
-        self.measures: np.ndarray | None = None
-        self.num_qubits: int | None = None
-
-    def estimate_observable(self, observable: SparsePauliOp) -> complex:
         """
-        Estimate an observable given. The shadow must already be computated using the method fit_shadow().
+        Initializes the parameters common to all Classical Shadow implementations.
+
+        Args:
+
+            num_snapshots (int | None): Number of snapshots to perform.
+
+        """
+        if nb_snapshots < 0:
+            raise ValueError("Number of snapshots must be greater than 0.")
+        else:
+            self.n_snapshots = nb_snapshots
+
+        self.measures = np.ndarray
+
+    def _median_of_mean(self, scores: np.ndarray, nb_blocs: int = 20) -> complex:
+        """
+        Computes the Median of Means (MoM) estimator of an array of scores.
+
+        The array is split into ``nb_blocs`` equally-sized blocks, the mean of
+        each block is computed, and the median of those block means is returned.
+        This estimator is more robust to outliers than a plain mean, and provides
+        high-confidence bounds on the estimation error.
+
+        Args:
+
+            scores (np.ndarray): 1-D array of scalar scores to aggregate.
+            nb_blocs (int): Number of blocks to split ``scores`` into. A higher
+                value increases robustness but reduces the number of samples per
+                block. Defaults to 20.
+
+        Returns:
+            complex: Median of the per-block means.
+        """
+        blocs = np.array_split(scores, nb_blocs)
+        moyennes_blocs = [np.mean(bloc) for bloc in blocs]
+
+        return np.median(moyennes_blocs)
+
+    def _estimate_observable(self, observable: SparsePauliOp) -> complex:
+        """
+        Estimates the expectation value of a given observable from the
+        already-constructed classical shadow.
+
+        The observable is decomposed into a weighted sum of Pauli operators.
+        The expectation value of each Pauli term is estimated separately via
+        :meth:`_estimate_pauli_expectation_value`, then the contributions are
+        summed taking the coefficients into account.
+
+        Args:
+            observable (SparsePauliOp): Quantum observable expressed as a
+                sparse linear combination of Pauli operators.
+
+        Returns:
+            complex: Estimated expectation value of the observable.
+
+        Raises:
+            ValueError: If :meth:`fit_shadow` has not been called yet
+                (i.e. ``self.measures`` is None).
+            ValueError: If the number of qubits in the observable does not
+                match the number of qubits in the shadow.
         """
         if self.measures is None:
             raise ValueError(
                 "Call fit_shadow(QuantumCircuit) before the estimation to create the local classical shadow."
             )
 
-        if self.num_qubits != observable.num_qubits:
+        if self.measures.shape[1] != observable.num_qubits:
             raise ValueError(
                 "The number of qubits in the observable is not the same as the number of qubits in the shadow."
             )
@@ -59,24 +111,56 @@ class BaseClassicalShadow(ABC):
 
             estimation_value += observable.coeffs[
                 i
-            ] * self.estimate_pauli_expectation_value(pauli)
+            ] * self._estimate_pauli_expectation_value(pauli)
 
         return estimation_value
+
+    def sample(self, circuits: list[QuantumCircuit], method: str) -> np.ndarray:
+        """
+        Given the list of circuit for each snapshots, simulate using the method needed.
+        """
 
     @abstractmethod
     def fit_shadow(
         self, quantum_state: QuantumCircuit, observable: SparsePauliOp | None = None
-    ) -> bool:
+    ):
         """
-        Make the shadow.
+        Builds the classical shadow from a quantum circuit.
+
+        This method must be called before any observable estimation. It applies
+        random unitaries, performs the measurements, and stores the results in
+        ``self.measures`` as well as the qubit count in ``self.measures.shape[1]``.
+
+        Args:
+
+            quantum_state (QuantumCircuit): Quantum circuit representing the quantum state from which the shadow is constructed.
+            observable (SparsePauliOp | None): Optional observable that may guide the choice of random unitaries in certain implementations
+                (e.g. adaptive shadows). Defaults to None.
+
+        Raises:
+            NotImplementedError: If the subclass does not implement this method.
         """
-        raise NotImplementedError("Fonction fit_shadow not implemented. Implement it.")
+        raise NotImplementedError("Fonction fit_shadow needs to be implemented.")
 
     @abstractmethod
-    def estimate_pauli_expectation_value(self, pauli: Pauli) -> complex:
+    def _estimate_pauli_expectation_value(self, pauli: Pauli) -> complex:
         """
-        Estimate an observable
+        Estimates the expectation value of a Pauli operator from the classical
+        shadow.
+
+        This method is called by :meth:`estimate_observable` for each Pauli
+        term in the observable decomposition. It forms the core of the
+        estimation computation and must be adapted to the sampling strategy of
+        each implementation.
+
+        Args:
+            pauli (Pauli): Pauli operator whose expectation value is to be
+                estimated (e.g. ``Pauli("XYZ")``).
+
+        Returns:
+            complex: Estimated expectation value of the Pauli operator.
+
+        Raises:
+            NotImplementedError: If the subclass does not implement this method.
         """
-        raise NotImplementedError(
-            "Fonction estimate_observable not implemented. Implement it."
-        )
+        raise NotImplementedError("Fonction estimate_observable not implemented.")

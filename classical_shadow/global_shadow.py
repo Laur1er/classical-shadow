@@ -17,23 +17,14 @@ class GlobalClassicalShadow(BaseClassicalShadow):
     This is an implementation of Global classical shadow using stabilizers.
     """
 
-    def __init__(
-        self,
-        num_snapshots=None,
-        error_margin=0.05,
-        precision=0.05,
-        num_active_qubits=5,
-        num_observable=5,
-    ):
-        super().__init__(
-            num_snapshots, error_margin, precision, num_active_qubits, num_observable
-        )
+    def __init__(self, num_snapshots):
+        super().__init__(num_snapshots)
 
-        self.clifford_measures = list()
+        self.measures_clifford = list()
 
     def fit_shadow(
         self, quantum_state: QuantumCircuit, observable: SparsePauliOp | None = None
-    ) -> bool:
+    ):
         """
         This does it
         """
@@ -43,7 +34,7 @@ class GlobalClassicalShadow(BaseClassicalShadow):
         for _ in range(self.n_snapshots):
 
             cliff = random_clifford(self.num_qubits)
-            self.clifford_measures.append(cliff)
+            self.measures_clifford.append(cliff)
 
             circuit = quantum_state.copy()
             circuit.compose(cliff.to_circuit(), inplace=True)
@@ -53,14 +44,12 @@ class GlobalClassicalShadow(BaseClassicalShadow):
 
         self.measures = np.array(measures).astype(int)
 
-        return True
-
-    def estimate_pauli_expectation_value(self, pauli: Pauli) -> complex:
+    def _estimate_pauli_expectation_value(self, pauli: Pauli) -> complex:
         """
         Ok
         """
         transformed_paulis = PauliList(
-            [pauli.evolve(cliff) for cliff in self.clifford_measures]
+            [pauli.evolve(cliff) for cliff in self.measures_clifford]
         )
         phases = (-1j) ** transformed_paulis.phase
 
@@ -71,7 +60,32 @@ class GlobalClassicalShadow(BaseClassicalShadow):
 
         scores = (2**transformed_paulis.num_qubits + 1) * eigenvalues
 
-        blocs = np.array_split(scores, self.NUM_BLOC)
-        moyennes_blocs = [np.mean(b) for b in blocs]
+        return self._median_of_mean(scores)
 
-        return np.median(moyennes_blocs)
+    def estimate_global_observable(self, observable: SparsePauliOp) -> complex:
+        """
+        Verify if it is global
+        """
+        return self._estimate_observable(observable)
+
+    ### Compute error margin
+
+    def calculer_erreur_bootstrap(scores, K=10, num_resamples=500):
+        N = len(scores)
+        predictions_bootstrap = []
+
+        for _ in range(num_resamples):
+
+            scores_resampled = np.random.choice(scores, size=N, replace=True)
+
+            # Calcul du MoM sur cet échantillon virtuel
+            blocs = np.array_split(scores_resampled, K)
+            moyennes_blocs = [np.mean(b) for b in blocs]
+            predictions_bootstrap.append(np.median(moyennes_blocs))
+
+        # Calcul de l'intervalle de confiance à 95%
+        borne_inf = np.percentile(predictions_bootstrap, 2.5)
+        borne_sup = np.percentile(predictions_bootstrap, 97.5)
+
+        marge_erreur = (borne_sup - borne_inf) / 2
+        return marge_erreur

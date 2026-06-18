@@ -15,7 +15,7 @@ def bell_shadow():
     bell.h(0)
     bell.cx(0, 1)
 
-    shadow = LocalClassicalShadow(num_snapshots=10000)
+    shadow = LocalClassicalShadow(nb_snapshots=10000)
     shadow.fit_shadow(bell)
     return bell, shadow
 
@@ -32,13 +32,10 @@ def bell_shadow():
 def test_bell_state(bell_shadow, observable: SparsePauliOp):
 
     bell, shadow = bell_shadow
-    expect_value = shadow.estimate_observable(observable)
+    expect_value = shadow.estimate_local_observable(observable)
     real_expect_value = classicaly_compute_estimation_value(observable, bell)
 
     assert np.linalg.norm(real_expect_value - expect_value) < 0.1
-
-
-### Voir avec plus gros circuit
 
 
 @pytest.fixture(scope="module")
@@ -51,7 +48,7 @@ def weird_state():
     state.sdg([2, 5, 6, 4])
     state.y([7, 8])
 
-    shadow = LocalClassicalShadow(num_snapshots=20000)
+    shadow = LocalClassicalShadow(nb_snapshots=20000)
     shadow.fit_shadow(state)
 
     return state, shadow
@@ -67,10 +64,10 @@ def weird_state():
         SparsePauliOp(["ZIIIIIIIIZ", "IIIIZZIIII", "IIYIIIXIII"], [-1.2, 3.4, 0.7]),
     ],
 )
-def test_random_state(weird_state, local_observable: SparsePauliOp):
+def test_bigger_state(weird_state, local_observable: SparsePauliOp):
 
     state, shadow = weird_state
-    expect_value = shadow.estimate_observable(local_observable)
+    expect_value = shadow.estimate_local_observable(local_observable)
     real_expect_value = classicaly_compute_estimation_value(local_observable, state)
 
     assert np.linalg.norm(real_expect_value - expect_value) < 0.1

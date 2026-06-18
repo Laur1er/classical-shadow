@@ -21,7 +21,7 @@ def global_Shadow():
     global_circuit.s([1, 2, 3])
     global_circuit.y([6, 7])
 
-    shadow = GlobalClassicalShadow(num_snapshots=17500)
+    shadow = GlobalClassicalShadow(num_snapshots=25000)
     shadow.fit_shadow(global_circuit)
 
     return global_circuit, shadow
@@ -39,7 +39,7 @@ def global_Shadow():
 def test_global_state(global_Shadow, observable: SparsePauliOp):
 
     global_circuit, shadow = global_Shadow
-    expect_value = shadow.estimate_observable(observable)
+    expect_value = shadow.estimate_global_observable(observable)
     real_expect_value = classicaly_compute_estimation_value(observable, global_circuit)
 
     assert np.linalg.norm(real_expect_value - expect_value) < 0.1
