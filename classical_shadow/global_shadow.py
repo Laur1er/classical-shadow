@@ -3,14 +3,13 @@ import numpy as np
 from qiskit.quantum_info import (
     PauliList,
     Pauli,
-    Clifford,
     SparsePauliOp,
     random_clifford,
 )
 from qiskit.circuit import QuantumCircuit
 from classical_shadow.base_shadow import BaseClassicalShadow
 
-from utils import run_circuit_once
+from classical_shadow.utils import run_circuit_once
 
 
 class GlobalClassicalShadow(BaseClassicalShadow):
@@ -38,6 +37,8 @@ class GlobalClassicalShadow(BaseClassicalShadow):
         """
         This does it
         """
+        self.num_qubits = quantum_state.num_qubits
+
         measures = []
         for _ in range(self.n_snapshots):
 
@@ -50,7 +51,7 @@ class GlobalClassicalShadow(BaseClassicalShadow):
 
             measures.append(list(run_circuit_once(circuit)))
 
-        self.measures = np.array(measures)
+        self.measures = np.array(measures).astype(int)
 
         return True
 
