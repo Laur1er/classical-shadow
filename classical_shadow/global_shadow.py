@@ -9,16 +9,14 @@ from qiskit.quantum_info import (
 from qiskit.circuit import QuantumCircuit
 from classical_shadow.base_shadow import BaseClassicalShadow
 
-from classical_shadow.utils import run_circuit_once
-
 
 class GlobalClassicalShadow(BaseClassicalShadow):
     """
     This is an implementation of Global classical shadow using stabilizers.
     """
 
-    def __init__(self, num_snapshots):
-        super().__init__(num_snapshots)
+    def __init__(self, num_snapshots, method: str = "perfect"):
+        super().__init__(num_snapshots, method)
 
         self.measures_clifford = list()
 
@@ -30,7 +28,7 @@ class GlobalClassicalShadow(BaseClassicalShadow):
         """
         self.num_qubits = quantum_state.num_qubits
 
-        measures = []
+        circuits = []
         for _ in range(self.n_snapshots):
 
             cliff = random_clifford(self.num_qubits)
@@ -40,9 +38,9 @@ class GlobalClassicalShadow(BaseClassicalShadow):
             circuit.compose(cliff.to_circuit(), inplace=True)
             circuit.measure_all()
 
-            measures.append(list(run_circuit_once(circuit)))
+            circuits.append(circuit)
 
-        self.measures = np.array(measures).astype(int)
+        self.measures = self._run_circuits(circuits)
 
     def _estimate_pauli_expectation_value(self, pauli: Pauli) -> complex:
         """

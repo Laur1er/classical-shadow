@@ -4,7 +4,6 @@ from qiskit.circuit import QuantumCircuit
 from qiskit.quantum_info import Pauli, PauliList, SparsePauliOp
 
 from classical_shadow.base_shadow import BaseClassicalShadow
-from classical_shadow.utils import run_circuit_once
 
 
 class LocalClassicalShadow(BaseClassicalShadow):
@@ -12,8 +11,8 @@ class LocalClassicalShadow(BaseClassicalShadow):
     This is an implementation of local classical shadows.
     """
 
-    def __init__(self, nb_snapshots):
-        super().__init__(nb_snapshots)
+    def __init__(self, nb_snapshots: int, method: str = "perfect"):
+        super().__init__(nb_snapshots, method)
 
         self.measures_basis = np.ndarray
 
@@ -37,7 +36,7 @@ class LocalClassicalShadow(BaseClassicalShadow):
         pauli_strings = np.array(["".join(row) for row in bases])
         paulis = PauliList(pauli_strings)
 
-        measures = []
+        circuits = []
         for pauli in paulis:
 
             circuit = quantum_state.copy()
@@ -50,10 +49,10 @@ class LocalClassicalShadow(BaseClassicalShadow):
                 circuit.h(where_x)
             circuit.measure_all()
 
-            measures.append(list(run_circuit_once(circuit)))
+            circuits.append(circuit)
 
         self.measures_basis = bases
-        self.measures = np.array(measures)
+        self.measures = self._run_circuits(circuits)
 
     def _estimate_pauli_expectation_value(self, pauli: Pauli) -> complex:
         """

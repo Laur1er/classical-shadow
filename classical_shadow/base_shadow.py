@@ -4,6 +4,8 @@ import numpy as np
 from qiskit.circuit import QuantumCircuit
 from qiskit.quantum_info import SparsePauliOp, Pauli
 
+from classical_shadow.utils import get_sampler
+
 
 class BaseClassicalShadow(ABC):
     """
@@ -30,18 +32,18 @@ class BaseClassicalShadow(ABC):
 
     """
 
-    def __init__(
-        self,
-        nb_snapshots: int,
-    ) -> None:
+    def __init__(self, nb_snapshots: int, method: str = "perfect") -> None:
         """
         Initializes the parameters common to all Classical Shadow implementations.
 
         Args:
 
             num_snapshots (int | None): Number of snapshots to perform.
+            method:      "perfect", "noisy", ou "real_hardware".
 
         """
+        self.sampler, self.pass_manager = get_sampler(method)
+
         if nb_snapshots < 0:
             raise ValueError("Number of snapshots must be greater than 0.")
         else:
@@ -115,10 +117,37 @@ class BaseClassicalShadow(ABC):
 
         return estimation_value
 
-    def sample(self, circuits: list[QuantumCircuit], method: str) -> np.ndarray:
+    def _run_circuits(
+        self,
+        circuits: list[QuantumCircuit],
+        batch_size: int = 300,
+    ) -> np.ndarray:
         """
-        Given the list of circuit for each snapshots, simulate using the method needed.
+        Exécute une liste de circuits (1 shot chacun) et retourne les bitstrings.
+
+        Args:
+            circuits:    Liste de QuantumCircuit, chacun avec un registre classique "meas".
+            batch_size:  Nombre max de circuits par job (limite IBM = ~300).
+
+        Returns:
+            np.ndarray de shape (N,) contenant les bitstrings, ex: ["0110", "1001", ...]
         """
+
+        if self.pass_manager is not None:
+            circuits = self.pass_manager.run(circuits)
+
+        all_bitstrings = []
+
+        for i in range(0, len(circuits), batch_size):
+            batch = circuits[i : i + batch_size]
+            job = self.sampler.run(batch, shots=1)
+            result = job.result()
+
+            for j in range(len(batch)):
+                bitstring = list(result[j].data.meas.get_bitstrings()[0])
+                all_bitstrings.append(bitstring)
+
+        return np.array(all_bitstrings).astype(int)
 
     @abstractmethod
     def fit_shadow(
