@@ -14,7 +14,7 @@ load_dotenv()
 
 def get_sampler(method: str = "perfect"):
     """
-    Initialise un sampler selon la méthode choisie.
+    Initialise a sampler according to the chosen method.
 
     Returns:
         tuple: (sampler, pass_manager)
@@ -34,12 +34,12 @@ def get_sampler(method: str = "perfect"):
         token = os.getenv("IBM_API_KEY")
         if not token:
             raise ValueError(
-                "IBM_API_KEY non trouvé dans les variables d'environnement (.env)"
+                "IBM_API_KEY not found in environnements plateforms (.env)"
             )
 
         service = QiskitRuntimeService(channel="ibm_quantum_platform", token=token)
         backend = service.least_busy(simulator=False, operational=True)
-        print(f"--- Connecté au hardware réel : {backend.name} ---")
+        print(f"--- Connected to the QPU : {backend.name} ---")
 
         sampler = RuntimeSampler(mode=backend)
         pm = generate_preset_pass_manager(optimization_level=1, backend=backend)
@@ -47,5 +47,5 @@ def get_sampler(method: str = "perfect"):
 
     else:
         raise ValueError(
-            f"Méthode inconnue: {method}. Choisir 'perfect', 'noisy', ou 'real_hardware'."
+            f"Unknown method: {method}. Choose 'perfect', 'noisy', or 'real_hardware'."
         )

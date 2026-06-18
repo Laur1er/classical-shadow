@@ -27,6 +27,7 @@ class BaseClassicalShadow(ABC):
 
     Attributes:
 
+        method: How the sampling should be performed "perfect", "noisy", or "real_hardware"
         n_snapshots (int): Number of snapshots (measurements) to perform.
         measures (np.ndarray): Array of recorded measurements after calling :meth:`fit_shadow`. Is None before that call.
 
@@ -39,7 +40,7 @@ class BaseClassicalShadow(ABC):
         Args:
 
             num_snapshots (int | None): Number of snapshots to perform.
-            method:      "perfect", "noisy", ou "real_hardware".
+            method:      "perfect", "noisy", or "real_hardware".
 
         """
         self.sampler, self.pass_manager = get_sampler(method)
@@ -123,14 +124,14 @@ class BaseClassicalShadow(ABC):
         batch_size: int = 300,
     ) -> np.ndarray:
         """
-        Exécute une liste de circuits (1 shot chacun) et retourne les bitstrings.
+        Execute a list of circuits (1 shot each) and returns the bitstrings.
 
         Args:
-            circuits:    Liste de QuantumCircuit, chacun avec un registre classique "meas".
-            batch_size:  Nombre max de circuits par job (limite IBM = ~300).
+            circuits:    List of QuantumCircuit, each with a classical register "meas".
+            batch_size:  Amount max of circuits per job (limit IBM = ~300).
 
         Returns:
-            np.ndarray de shape (N,) contenant les bitstrings, ex: ["0110", "1001", ...]
+            np.ndarray of shape (N, num_qubits) containing the resulting bitstrings, ex: [["0","1","0"], ["1","1,","0"], [...]...]
         """
 
         if self.pass_manager is not None:
