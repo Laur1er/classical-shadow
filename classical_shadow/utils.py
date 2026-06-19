@@ -12,7 +12,7 @@ from qiskit_aer import AerSimulator
 from qiskit_aer.primitives import SamplerV2 as NoisySampler
 from qiskit_ibm_runtime import SamplerV2 as RuntimeSampler
 from qiskit_ibm_runtime import QiskitRuntimeService
-from qiskit_ibm_runtime.fake_provider import FakeManilaV2
+from qiskit_ibm_runtime.fake_provider import FakeSherbrooke
 
 load_dotenv()
 
@@ -28,7 +28,7 @@ def get_sampler(method: str = "perfect"):
         return StatevectorSampler(), None
 
     elif method == "noisy":
-        fake_backend = FakeManilaV2()
+        fake_backend = FakeSherbrooke()
         noisy_simulator = AerSimulator.from_backend(fake_backend)
 
         sampler = NoisySampler.from_backend(noisy_simulator)

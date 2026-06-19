@@ -123,7 +123,7 @@ class BaseClassicalShadow(ABC):
     def _run_circuits(
         self,
         circuits: list[QuantumCircuit],
-        batch_size: int = 300,
+        batch_size: int = 15000,
     ) -> np.ndarray:
         """
         Execute a list of circuits (1 shot each) and returns the bitstrings.
