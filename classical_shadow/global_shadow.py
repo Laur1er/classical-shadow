@@ -5,6 +5,7 @@ from qiskit.quantum_info import (
     Pauli,
     SparsePauliOp,
     random_clifford,
+    Clifford,
 )
 from qiskit.circuit import QuantumCircuit
 from classical_shadow.base_shadow import BaseClassicalShadow
@@ -135,4 +136,63 @@ class GlobalClassicalShadow(BaseClassicalShadow):
         """
         return self._estimate_observable(observable)
 
-    ### Compute error margin
+    def recover_shadow(self, dir: str) -> "GlobalClassicalShadow":
+        """
+        Restores the global shadow from a previously saved ``.npz`` file.
+
+        Loads ``measures`` and the symplectic tableau representation of each
+        Clifford operator from the file at ``dir``, reconstructs the
+        ``Clifford`` objects, and populates the instance in-place.
+
+        Args:
+            dir (str): Path to the ``.npz`` file produced by
+                :meth:`save_shadow` (e.g. ``"shadows/global_shadow.npz"``).
+
+        Returns:
+            GlobalClassicalShadow: The current instance with its attributes
+                restored, allowing method chaining.
+
+        Raises:
+            FileNotFoundError: If no file exists at ``dir``.
+        """
+
+        data = np.load(dir, allow_pickle=False)
+        self.measures = data["measures"]
+        self.num_qubits = self.measures.shape[1]
+        self.n_snapshots = self.measures.shape[0]
+
+        # Reconstruct Clifford objects from their symplectic tableau
+        tableaux = data["clifford_tableaux"]  # shape: (n_snapshots, 2n, 2n+1)
+        self.measures_clifford = [Clifford(tableaux[i]) for i in range(len(tableaux))]
+
+        return self
+
+    def save_shadow(self, dir: str) -> None:
+        """
+        Persists the global shadow's core attributes to a compressed ``.npz``
+        file.
+
+        Saves ``measures`` (the measurement bitstrings) and the symplectic
+        tableau representation of each Clifford unitary. The tableaux allow
+        full reconstruction of the ``Clifford`` objects upon loading via
+        :meth:`recover_shadow`, without relying on Python pickling.
+
+        Args:
+            dir (str): Destination path for the ``.npz`` file
+                (e.g. ``"shadows/global_shadow.npz"``). NumPy appends
+                ``.npz`` automatically if the extension is omitted.
+
+        Raises:
+            ValueError: If :meth:`fit_shadow` has not been called yet and
+                ``self.measures`` or ``self.measures_clifford`` is empty.
+        """
+        if self.measures is None or not self.measures_clifford:
+            raise ValueError(
+                "Shadow has not been built yet. Call fit_shadow() before saving."
+            )
+
+        # Serialize each Clifford as its boolean symplectic tableau
+        tableaux = np.array(
+            [cliff.tableau.astype(bool) for cliff in self.measures_clifford]
+        )
+        np.savez_compressed(dir, measures=self.measures, clifford_tableaux=tableaux)

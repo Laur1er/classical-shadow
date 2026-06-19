@@ -175,3 +175,56 @@ class LocalClassicalShadow(BaseClassicalShadow):
             raise ValueError(f"Observable {observable} is not a local observable.")
 
         return self._estimate_observable(observable)
+
+    def recover_shadow(self, dir: str) -> "LocalClassicalShadow":
+        """
+        Restores the local shadow from a previously saved ``.npz`` file.
+
+        Loads ``measures`` and ``measures_basis`` from the file at ``dir``
+        and populates the instance in-place, making it immediately ready for
+        observable estimation via :meth:`estimate_local_observable`.
+
+        Args:
+            dir (str): Path to the ``.npz`` file produced by
+                :meth:`save_shadow` (e.g. ``"shadows/local_shadow.npz"``).
+
+        Returns:
+            LocalClassicalShadow: The current instance with its attributes
+                restored, allowing method chaining.
+
+        Raises:
+            FileNotFoundError: If no file exists at ``dir``.
+        """
+        data = np.load(dir, allow_pickle=False)
+        self.measures = data["measures"]
+        self.measures_basis = data["measures_basis"]
+        self.num_qubits = self.measures.shape[1]
+        self.n_snapshots = self.measures.shape[0]
+        return self
+
+    def save_shadow(self, dir: str) -> None:
+        """
+        Persists the local shadow's core attributes to a compressed ``.npz``
+        file.
+
+        Saves ``measures`` (the measurement bitstrings) and ``measures_basis``
+        (the per-qubit Pauli bases) to ``dir``. These two arrays are the
+        minimum required to fully restore the shadow via
+        :meth:`recover_shadow`.
+
+        Args:
+            dir (str): Destination path for the ``.npz`` file
+                (e.g. ``"shadows/local_shadow.npz"``). NumPy appends
+                ``.npz`` automatically if the extension is omitted.
+
+        Raises:
+            ValueError: If :meth:`fit_shadow` has not been called yet and
+                ``self.measures`` or ``self.measures_basis`` is None.
+        """
+        if self.measures is None or not isinstance(self.measures_basis, np.ndarray):
+            raise ValueError(
+                "Shadow has not been built yet. Call fit_shadow() before saving."
+            )
+        np.savez_compressed(
+            dir, measures=self.measures, measures_basis=self.measures_basis
+        )

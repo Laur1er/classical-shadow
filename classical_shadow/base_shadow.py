@@ -194,3 +194,45 @@ class BaseClassicalShadow(ABC):
             NotImplementedError: If the subclass does not implement this method.
         """
         raise NotImplementedError("Fonction estimate_observable not implemented.")
+
+    @abstractmethod
+    def recover_shadow(self, dir: str) -> "BaseClassicalShadow":
+        """
+        Restores the shadow state from a previously saved file.
+
+        Loads the shadow's core attributes from the file located at ``dir``
+        and populates the instance in-place, making it ready for observable
+        estimation without needing to re-run :meth:`fit_shadow`.
+
+        Args:
+            dir (str): Path to the file from which the shadow is loaded
+                (e.g. ``"shadows/my_shadow.npz"``).
+
+        Returns:
+            BaseClassicalShadow: The current instance with its attributes
+                restored, allowing method chaining.
+
+        Raises:
+            FileNotFoundError: If no file exists at ``dir``.
+            NotImplementedError: If the subclass does not implement this method.
+        """
+        raise NotImplementedError("Fonction recover_shadow not implemented.")
+
+    @abstractmethod
+    def save_shadow(self, dir: str) -> None:
+        """
+        Persists the shadow's core attributes to disk.
+
+        Saves the minimum set of attributes required to fully restore the
+        shadow via :meth:`recover_shadow`, without needing to re-run
+        :meth:`fit_shadow`.
+
+        Args:
+            dir (str): Path to the output file
+                (e.g. ``"shadows/my_shadow.npz"``). Parent directories must
+                already exist.
+
+        Raises:
+            NotImplementedError: If the subclass does not implement this method.
+        """
+        raise NotImplementedError("Fonction save_shadow not implemented.")
