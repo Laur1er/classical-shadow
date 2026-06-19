@@ -176,31 +176,34 @@ class LocalClassicalShadow(BaseClassicalShadow):
 
         return self._estimate_observable(observable)
 
-    def recover_shadow(self, dir: str) -> "LocalClassicalShadow":
+    @classmethod
+    def recover_shadow(cls, dir: str) -> "LocalClassicalShadow":
         """
-        Restores the local shadow from a previously saved ``.npz`` file.
+        Restores a local shadow from a previously saved ``.npz`` file.
 
-        Loads ``measures`` and ``measures_basis`` from the file at ``dir``
-        and populates the instance in-place, making it immediately ready for
-        observable estimation via :meth:`estimate_local_observable`.
+        Instantiates a new :class:`LocalClassicalShadow`, then loads
+        ``measures`` and ``measures_basis`` from the file at ``dir``.
+        ``num_qubits`` and ``n_snapshots`` are inferred directly from the
+        shape of ``measures``.
 
         Args:
             dir (str): Path to the ``.npz`` file produced by
                 :meth:`save_shadow` (e.g. ``"shadows/local_shadow.npz"``).
 
         Returns:
-            LocalClassicalShadow: The current instance with its attributes
-                restored, allowing method chaining.
+            LocalClassicalShadow: A new instance with its attributes restored,
+                ready for observable estimation.
 
         Raises:
             FileNotFoundError: If no file exists at ``dir``.
         """
+        instance = cls(nb_snapshots=0)
         data = np.load(dir, allow_pickle=False)
-        self.measures = data["measures"]
-        self.measures_basis = data["measures_basis"]
-        self.num_qubits = self.measures.shape[1]
-        self.n_snapshots = self.measures.shape[0]
-        return self
+        instance.measures = data["measures"]
+        instance.measures_basis = data["measures_basis"]
+        instance.num_qubits = instance.measures.shape[1]
+        instance.n_snapshots = instance.measures.shape[0]
+        return instance
 
     def save_shadow(self, dir: str) -> None:
         """

@@ -1,6 +1,11 @@
 import os
+import numpy as np
 
 from dotenv import load_dotenv
+
+from qiskit.circuit import QuantumCircuit
+from qiskit.quantum_info import SparsePauliOp, Statevector
+
 from qiskit.primitives import StatevectorSampler
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_aer import AerSimulator
@@ -49,3 +54,17 @@ def get_sampler(method: str = "perfect"):
         raise ValueError(
             f"Unknown method: {method}. Choose 'perfect', 'noisy', or 'real_hardware'."
         )
+
+
+def classicaly_compute_estimation_value(
+    observable: SparsePauliOp, state_vector: QuantumCircuit
+) -> np.complex128:
+    """
+    Computes classicaly the estimation value by sandwitching the observable between the statevector.
+    """
+    statevector = Statevector(state_vector).data
+    matrix_observable = observable.to_matrix()
+    real_expect_value = np.einsum(
+        "i,ij,j", statevector.conj(), matrix_observable, statevector
+    )
+    return real_expect_value

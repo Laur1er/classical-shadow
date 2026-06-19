@@ -136,36 +136,42 @@ class GlobalClassicalShadow(BaseClassicalShadow):
         """
         return self._estimate_observable(observable)
 
-    def recover_shadow(self, dir: str) -> "GlobalClassicalShadow":
+    @classmethod
+    def recover_shadow(cls, dir: str) -> "GlobalClassicalShadow":
         """
-        Restores the global shadow from a previously saved ``.npz`` file.
+        Restores a global shadow from a previously saved ``.npz`` file.
 
-        Loads ``measures`` and the symplectic tableau representation of each
-        Clifford operator from the file at ``dir``, reconstructs the
-        ``Clifford`` objects, and populates the instance in-place.
+        Instantiates a new :class:`GlobalClassicalShadow`, then loads
+        ``measures`` and the symplectic tableau representation of each
+        Clifford operator from ``dir``. The ``Clifford`` objects are
+        reconstructed from their tableaux. ``num_qubits`` and ``n_snapshots``
+        are inferred from the shape of ``measures``.
 
         Args:
             dir (str): Path to the ``.npz`` file produced by
                 :meth:`save_shadow` (e.g. ``"shadows/global_shadow.npz"``).
 
         Returns:
-            GlobalClassicalShadow: The current instance with its attributes
-                restored, allowing method chaining.
+            GlobalClassicalShadow: A new instance with its attributes restored,
+                ready for observable estimation.
 
         Raises:
             FileNotFoundError: If no file exists at ``dir``.
         """
+        from qiskit.quantum_info import Clifford
 
+        instance = cls(num_snapshots=0)
         data = np.load(dir, allow_pickle=False)
-        self.measures = data["measures"]
-        self.num_qubits = self.measures.shape[1]
-        self.n_snapshots = self.measures.shape[0]
+        instance.measures = data["measures"]
+        instance.num_qubits = instance.measures.shape[1]
+        instance.n_snapshots = instance.measures.shape[0]
 
-        # Reconstruct Clifford objects from their symplectic tableau
-        tableaux = data["clifford_tableaux"]  # shape: (n_snapshots, 2n, 2n+1)
-        self.measures_clifford = [Clifford(tableaux[i]) for i in range(len(tableaux))]
+        tableaux = data["clifford_tableaux"]
+        instance.measures_clifford = [
+            Clifford(tableaux[i]) for i in range(len(tableaux))
+        ]
 
-        return self
+        return instance
 
     def save_shadow(self, dir: str) -> None:
         """

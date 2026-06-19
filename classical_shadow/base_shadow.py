@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import numpy as np
+from tqdm import tqdm
 
 from qiskit.circuit import QuantumCircuit
 from qiskit.quantum_info import SparsePauliOp, Pauli
@@ -50,6 +51,7 @@ class BaseClassicalShadow(ABC):
         else:
             self.n_snapshots = nb_snapshots
 
+        self.method = method
         self.measures = np.ndarray
 
     def _median_of_mean(self, scores: np.ndarray, nb_blocs: int = 20) -> complex:
@@ -139,7 +141,10 @@ class BaseClassicalShadow(ABC):
 
         all_bitstrings = []
 
-        for i in range(0, len(circuits), batch_size):
+        for i in tqdm(
+            range(0, len(circuits), batch_size),
+            f"Running circuit using {self.method} backend.",
+        ):
             batch = circuits[i : i + batch_size]
             job = self.sampler.run(batch, shots=1)
             result = job.result()
@@ -195,22 +200,22 @@ class BaseClassicalShadow(ABC):
         """
         raise NotImplementedError("Fonction estimate_observable not implemented.")
 
+    @classmethod
     @abstractmethod
-    def recover_shadow(self, dir: str) -> "BaseClassicalShadow":
+    def recover_shadow(cls, dir: str) -> "BaseClassicalShadow":
         """
         Restores the shadow state from a previously saved file.
 
         Loads the shadow's core attributes from the file located at ``dir``
-        and populates the instance in-place, making it ready for observable
-        estimation without needing to re-run :meth:`fit_shadow`.
+        and returns a fully restored instance, ready for observable estimation
+        without needing to re-run :meth:`fit_shadow`.
 
         Args:
             dir (str): Path to the file from which the shadow is loaded
                 (e.g. ``"shadows/my_shadow.npz"``).
 
         Returns:
-            BaseClassicalShadow: The current instance with its attributes
-                restored, allowing method chaining.
+            BaseClassicalShadow: A new instance with its attributes restored.
 
         Raises:
             FileNotFoundError: If no file exists at ``dir``.
