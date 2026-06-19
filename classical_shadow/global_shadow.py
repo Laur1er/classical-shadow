@@ -12,10 +12,36 @@ from classical_shadow.base_shadow import BaseClassicalShadow
 
 class GlobalClassicalShadow(BaseClassicalShadow):
     """
-    This is an implementation of Global classical shadow using stabilizers.
+    Global Classical Shadow implementation using random Clifford unitaries.
+
+    In this scheme, a uniformly random global Clifford unitary is applied to
+    the full quantum state at each snapshot before measuring in the
+    computational basis. Because the unitary acts on all qubits simultaneously,
+    this approach can efficiently estimate observables with arbitrary support,
+    at the cost of a sample complexity that scales with the Frobenius norm of
+    the observable rather than its locality.
+
+    The expectation value of a Pauli operator is recovered by conjugating the
+    Pauli through each snapshot's Clifford (via the stabilizer formalism) and
+    comparing the resulting stabilizer eigenvalue with the observed bitstring.
+
+    Attributes:
+        measures_clifford (list[Clifford]): List of random Clifford operators
+            applied at each snapshot, in the same order as ``self.measures``.
+            Populated by :meth:`fit_shadow`.
     """
 
     def __init__(self, num_snapshots, method: str = "perfect"):
+        """
+        Initializes the Global Classical Shadow.
+
+        Args:
+            num_snapshots (int): Number of snapshots (random Clifford
+                measurements) to perform when building the shadow.
+            method (str): Simulation method passed to the parent class,
+                controlling how circuits are executed (e.g. ``"perfect"`` for
+                noiseless simulation). Defaults to ``"perfect"``.
+        """
         super().__init__(num_snapshots, method)
 
         self.measures_clifford = list()
@@ -24,7 +50,21 @@ class GlobalClassicalShadow(BaseClassicalShadow):
         self, quantum_state: QuantumCircuit, observable: SparsePauliOp | None = None
     ):
         """
-        This does it
+        Builds the global classical shadow of a quantum state.
+
+        For each snapshot, a uniformly random Clifford unitary is sampled,
+        appended to the quantum state circuit, and the resulting circuit is
+        measured in the computational basis. The Clifford operators and the
+        measurement bitstrings are stored in ``self.measures_clifford`` and
+        ``self.measures`` respectively.
+
+        Args:
+            quantum_state (QuantumCircuit): Circuit representing the quantum
+                state to shadow. Must not include measurements (they are added
+                internally).
+            observable (SparsePauliOp | None): Unused in this implementation.
+                Present for compatibility with the base class interface.
+                Defaults to None.
         """
         self.num_qubits = quantum_state.num_qubits
 
@@ -44,7 +84,25 @@ class GlobalClassicalShadow(BaseClassicalShadow):
 
     def _estimate_pauli_expectation_value(self, pauli: Pauli) -> complex:
         """
-        Ok
+        Estimates the expectation value of a single Pauli operator from the
+        global classical shadow.
+
+        For each snapshot, the Pauli is conjugated through the corresponding
+        Clifford unitary via the stabilizer formalism (``pauli.evolve(cliff)``).
+        If the resulting operator is a pure Z-type Pauli (no X component), its
+        eigenvalue is read off the measurement bitstring using the phase and the
+        parity of the measured bits. Snapshots that yield an X component after
+        conjugation contribute zero. The per-snapshot scores are scaled by
+        ``2^n + 1`` (where ``n`` is the number of qubits) to match the inverse
+        channel of the global shadow, and the final estimate is obtained via
+        Median of Means aggregation.
+
+        Args:
+            pauli (Pauli): Single Pauli operator whose expectation value is to
+                be estimated (e.g. ``Pauli("XYZ")``).
+
+        Returns:
+            complex: Estimated expectation value of the Pauli operator.
         """
         transformed_paulis = PauliList(
             [pauli.evolve(cliff) for cliff in self.measures_clifford]
@@ -62,28 +120,19 @@ class GlobalClassicalShadow(BaseClassicalShadow):
 
     def estimate_global_observable(self, observable: SparsePauliOp) -> complex:
         """
-        Verify if it is global
+        Estimates the expectation value of a global observable from the shadow.
+
+        Unlike :meth:`~LocalClassicalShadow.estimate_local_observable`, no
+        locality constraint is enforced here: the global Clifford scheme can
+        handle observables with arbitrary qubit support.
+
+        Args:
+            observable (SparsePauliOp): Observable expressed as a sparse linear
+                combination of Pauli operators.
+
+        Returns:
+            complex: Estimated expectation value of the observable.
         """
         return self._estimate_observable(observable)
 
     ### Compute error margin
-
-    def calculer_erreur_bootstrap(scores, K=10, num_resamples=500):
-        N = len(scores)
-        predictions_bootstrap = []
-
-        for _ in range(num_resamples):
-
-            scores_resampled = np.random.choice(scores, size=N, replace=True)
-
-            # Calcul du MoM sur cet échantillon virtuel
-            blocs = np.array_split(scores_resampled, K)
-            moyennes_blocs = [np.mean(b) for b in blocs]
-            predictions_bootstrap.append(np.median(moyennes_blocs))
-
-        # Calcul de l'intervalle de confiance à 95%
-        borne_inf = np.percentile(predictions_bootstrap, 2.5)
-        borne_sup = np.percentile(predictions_bootstrap, 97.5)
-
-        marge_erreur = (borne_sup - borne_inf) / 2
-        return marge_erreur

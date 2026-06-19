@@ -8,10 +8,33 @@ from classical_shadow.base_shadow import BaseClassicalShadow
 
 class LocalClassicalShadow(BaseClassicalShadow):
     """
-    This is an implementation of local classical shadows.
+    Local Classical Shadow implementation.
+
+    In this scheme, random unitaries are drawn independently and uniformly
+    from the single-qubit Pauli bases {X, Y, Z} for each qubit at each
+    snapshot. This locality makes the estimator particularly efficient for
+    observables that act non-trivially on a small number of qubits (local
+    observables), as the sample complexity scales with the locality of the
+    observable rather than the total number of qubits.
+
+    Attributes:
+        measures_basis (np.ndarray): 2-D array of shape
+            ``(n_snapshots, num_qubits)`` storing the randomly chosen
+            measurement basis ('X', 'Y', or 'Z') for each qubit at each
+            snapshot. Populated by :meth:`fit_shadow`.
     """
 
     def __init__(self, nb_snapshots: int, method: str = "perfect"):
+        """
+        Initializes the Local Classical Shadow.
+
+        Args:
+            nb_snapshots (int): Number of snapshots (random measurements) to
+                perform when building the shadow.
+            method (str): Simulation method passed to the parent class,
+                controlling how circuits are executed (e.g. ``"perfect"`` for
+                noiseless simulation). Defaults to ``"perfect"``.
+        """
         super().__init__(nb_snapshots, method)
 
         self.measures_basis = np.ndarray
@@ -20,7 +43,28 @@ class LocalClassicalShadow(BaseClassicalShadow):
         self, quantum_state: QuantumCircuit, observable: SparsePauliOp | None = None
     ):
         """
-        This fonction uses Shadow Local to produce the shadow of a quantum state.
+        Builds the local classical shadow of a quantum state.
+
+        For each snapshot, a random single-qubit Pauli basis is independently
+        sampled for every qubit. The state is then rotated into that basis and
+        measured in the computational basis. The chosen bases and the resulting
+        bitstrings are stored in ``self.measures_basis`` and ``self.measures``
+        respectively.
+
+        If the number of requested snapshots exceeds 50 000, the user is
+        prompted for confirmation before proceeding.
+
+        Args:
+            quantum_state (QuantumCircuit): Circuit representing the quantum
+                state to shadow. Must not include measurements (they are added
+                internally).
+            observable (SparsePauliOp | None): Unused in this implementation.
+                Present for compatibility with the base class interface.
+                Defaults to None.
+
+        Raises:
+            TimeoutError: If ``n_snapshots`` exceeds 50 000 and the user
+                declines to proceed.
         """
 
         if self.n_snapshots > 50000:
@@ -56,23 +100,36 @@ class LocalClassicalShadow(BaseClassicalShadow):
 
     def _estimate_pauli_expectation_value(self, pauli: Pauli) -> complex:
         """
-        Fonction to predict expectation value of a single Pauli operator using the classical shadow.
+        Estimates the expectation value of a single Pauli operator from the
+        local classical shadow.
+
+        Only the snapshots whose randomly chosen basis matches the non-identity
+        support of ``pauli`` on every active qubit are used. For those
+        matching snapshots, the eigenvalue contribution is computed as
+        ``3^k * (-1)^(sum of measurement bits)``, where ``k`` is the number of
+        active (non-identity) qubits. The final estimate is obtained via the
+        Median of Means aggregation over all snapshots.
+
+        Args:
+            pauli (Pauli): Single Pauli operator whose expectation value is to
+                be estimated (e.g. ``Pauli("XYZ")``).
+
+        Returns:
+            complex: Estimated expectation value of the Pauli operator.
         """
-        # Sortir les qubits actif et leur base
+
         pos_active_qubits = (
             pauli.num_qubits - 1 - np.nonzero(np.logical_or(pauli.x, pauli.z))[0]
         )
         base_active_qubits = np.array(list(pauli.to_label()))[pos_active_qubits]
         num_active_qubits = len(base_active_qubits)
 
-        # Pour chaque snapshot, on doit verifier si les bases concordent.
         coresponding_snapshots = np.where(
             np.all(
                 self.measures_basis[:, pos_active_qubits] == base_active_qubits, axis=1
             )
         )[0]
 
-        # Calcule de la valeur propres
         scores = np.zeros(self.measures.shape[0])
         scores[coresponding_snapshots] += 3**num_active_qubits
 
@@ -91,7 +148,30 @@ class LocalClassicalShadow(BaseClassicalShadow):
 
     def estimate_local_observable(self, observable: SparsePauliOp) -> complex:
         """
-        Verify if the observable is local
+        Estimates the expectation value of a local observable from the shadow.
+
+        Before estimation, validates that the observable acts non-trivially on
+        at most 4 qubits (i.e. has locality ≤ 4). If this condition is not
+        met, a ``ValueError`` is raised.
+
+        Args:
+            observable (SparsePauliOp): Local observable expressed as a sparse
+                linear combination of Pauli operators.
+
+        Returns:
+            complex: Estimated expectation value of the observable.
+
+        Raises:
+            ValueError: If any Pauli term in ``observable`` acts on more than
+                4 qubits non-trivially.
         """
+        if (
+            np.sum(
+                np.logical_or(observable.paulis.x, observable.paulis.z).astype(int),
+                axis=-1,
+            )
+            > 4
+        ):
+            raise ValueError(f"Observable {observable} is not a local observable.")
 
         return self._estimate_observable(observable)
