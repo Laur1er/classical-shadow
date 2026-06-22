@@ -30,16 +30,19 @@ real_hardware_shadow = LocalClassicalShadow(nb_snapshots=15000, method="real_har
 
 print("Shadow configuration DONE.\n")
 
-# Creation of the different shadows
-perfect_shadow.fit_shadow(state)
-noisy_shadow.fit_shadow(state)
-real_hardware_shadow.fit_shadow(state)
-
-print("Creation of shadows DONE.\n")
-
-# Saving the shadows
+# Perfect
+# perfect_shadow.fit_shadow(state)
 perfect_shadow.save_shadow("results/exp1_local/perfect_shadow")
-noisy_shadow.save_shadow("results/exp1_local/noisy_shadow")
-real_hardware_shadow.save_shadow("results/exp1_local/real_hardware_shadow")
+print("Creation of shadow using perfect backend DONE.\n")
 
-print("Shadows SAVED.\n")
+# Noisy
+# noisy_shadow.fit_shadow(state)
+noisy_shadow.save_shadow("results/exp1_local/noisy_shadow")
+print("Creation of shadow using noisy backend DONE.\n")
+
+# Real hardware
+real_hardware_shadow.fit_shadow(state)
+real_hardware_shadow.save_shadow("results/exp1_local/real_hardware_shadow")
+print("Creation of shadow using real hardware backend DONE.\n")
+
+print("Experiment #1: Local classical shadow of a quantum state -> DONE \n")
