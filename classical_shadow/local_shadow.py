@@ -166,9 +166,11 @@ class LocalClassicalShadow(BaseClassicalShadow):
                 4 qubits non-trivially.
         """
         if (
-            np.sum(
-                np.logical_or(observable.paulis.x, observable.paulis.z).astype(int),
-                axis=-1,
+            np.max(
+                np.sum(
+                    np.logical_or(observable.paulis.x, observable.paulis.z).astype(int),
+                    axis=-1,
+                )
             )
             > 4
         ):

@@ -31,12 +31,12 @@ real_hardware_shadow = LocalClassicalShadow(nb_snapshots=15000, method="real_har
 print("Shadow configuration DONE.\n")
 
 # Perfect
-# perfect_shadow.fit_shadow(state)
+perfect_shadow.fit_shadow(state)
 perfect_shadow.save_shadow("results/exp1_local/perfect_shadow")
 print("Creation of shadow using perfect backend DONE.\n")
 
 # Noisy
-# noisy_shadow.fit_shadow(state)
+noisy_shadow.fit_shadow(state)
 noisy_shadow.save_shadow("results/exp1_local/noisy_shadow")
 print("Creation of shadow using noisy backend DONE.\n")
 
