@@ -6,10 +6,9 @@ from dotenv import load_dotenv
 from qiskit.circuit import QuantumCircuit
 from qiskit.quantum_info import SparsePauliOp, Statevector
 
-from qiskit.primitives import StatevectorSampler
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_aer import AerSimulator
-from qiskit_aer.primitives import SamplerV2 as NoisySampler
+from qiskit_aer.primitives import SamplerV2 as AerSampler
 from qiskit_ibm_runtime import SamplerV2 as RuntimeSampler
 from qiskit_ibm_runtime import QiskitRuntimeService
 from qiskit_ibm_runtime.fake_provider import FakeSherbrooke
@@ -25,13 +24,17 @@ def get_sampler(method: str = "perfect"):
         tuple: (sampler, pass_manager)
     """
     if method == "perfect":
-        return StatevectorSampler(), None
+        backend = AerSimulator()
+        sampler = AerSampler()
+
+        pm = generate_preset_pass_manager(optimization_level=1, backend=backend)
+        return sampler, pm
 
     elif method == "noisy":
         fake_backend = FakeSherbrooke()
         noisy_simulator = AerSimulator.from_backend(fake_backend)
 
-        sampler = NoisySampler.from_backend(noisy_simulator)
+        sampler = AerSampler.from_backend(noisy_simulator)
         pm = generate_preset_pass_manager(optimization_level=1, backend=fake_backend)
         return sampler, pm
 

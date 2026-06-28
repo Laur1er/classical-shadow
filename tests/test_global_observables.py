@@ -21,7 +21,7 @@ def global_Shadow():
     global_circuit.s([1, 2, 3])
     global_circuit.y([6, 7])
 
-    shadow = GlobalClassicalShadow(num_snapshots=25000)
+    shadow = GlobalClassicalShadow(nb_snapshots=25000)
     shadow.fit_shadow(global_circuit)
 
     return global_circuit, shadow

@@ -32,7 +32,7 @@ class GlobalClassicalShadow(BaseClassicalShadow):
             Populated by :meth:`fit_shadow`.
     """
 
-    def __init__(self, num_snapshots, method: str = "perfect"):
+    def __init__(self, nb_snapshots, method: str = "perfect"):
         """
         Initializes the Global Classical Shadow.
 
@@ -43,7 +43,7 @@ class GlobalClassicalShadow(BaseClassicalShadow):
                 controlling how circuits are executed (e.g. ``"perfect"`` for
                 noiseless simulation). Defaults to ``"perfect"``.
         """
-        super().__init__(num_snapshots, method)
+        super().__init__(nb_snapshots, method)
 
         self.measures_clifford = list()
 
@@ -160,7 +160,7 @@ class GlobalClassicalShadow(BaseClassicalShadow):
         """
         from qiskit.quantum_info import Clifford
 
-        instance = cls(num_snapshots=0)
+        instance = cls(nb_snapshots=0)
         data = np.load(dir, allow_pickle=False)
         instance.measures = data["measures"]
         instance.num_qubits = instance.measures.shape[1]

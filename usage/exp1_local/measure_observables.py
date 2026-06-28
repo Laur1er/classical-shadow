@@ -1,7 +1,6 @@
 import numpy as np
 
 from qiskit import qpy
-from qiskit.circuit import QuantumCircuit
 from qiskit.quantum_info import SparsePauliOp, Statevector
 
 from classical_shadow.local_shadow import LocalClassicalShadow
