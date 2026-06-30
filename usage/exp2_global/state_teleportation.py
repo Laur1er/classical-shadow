@@ -31,14 +31,14 @@ for i in range(4):
 
     # Mesures
     state_teleportated.measure(init_reg[i], adj_reg[i])
-    state_teleportated.measure(bells[i], adj_reg[4 + i])
+    state_teleportated.measure(bells[4 + i], adj_reg[4 + i])
 
     # Corrections classiquement conditionnelles
     with state_teleportated.if_test((adj_reg[4 + i], 1)):
-        state_teleportated.x(bells[4 + i])
+        state_teleportated.x(bells[i])
 
     with state_teleportated.if_test((adj_reg[i], 1)):
-        state_teleportated.z(bells[4 + i])
+        state_teleportated.z(bells[i])
 
 
 # Prepare the actual state in order to compare

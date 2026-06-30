@@ -7,7 +7,7 @@ with open("results/exp2_global/state.qpy", "rb") as handle:
 
 # Initialising configurations
 perfect_shadow = GlobalClassicalShadow(nb_snapshots=15000, method="perfect")
-# noisy_shadow = GlobalClassicalShadow(nb_snapshots=15000, method="noisy")
+noisy_shadow = GlobalClassicalShadow(nb_snapshots=15000, method="noisy")
 # real_hardware_shadow = GlobalClassicalShadow(nb_snapshots=15000, method="real_hardware")
 
 print("Shadow configuration DONE.\n")
@@ -18,9 +18,9 @@ perfect_shadow.save_shadow("results/exp2_global/perfect_shadow")
 print("Creation of shadow using perfect backend DONE.\n")
 
 # Noisy
-# noisy_shadow.fit_shadow(state)
-# noisy_shadow.save_shadow("results/exp2_global/noisy_shadow")
-# print("Creation of shadow using noisy backend DONE.\n")
+noisy_shadow.fit_shadow(state)
+noisy_shadow.save_shadow("results/exp2_global/noisy_shadow")
+print("Creation of shadow using noisy backend DONE.\n")
 
 # # Real hardware
 # real_hardware_shadow.fit_shadow(state)

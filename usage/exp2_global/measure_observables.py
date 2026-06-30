@@ -23,7 +23,7 @@ with open("results/exp2_global/state.qpy", "rb") as handle:
 statevector = Statevector(state).data
 
 # Define observables. Because we want to compare with only the state that has been teleported, we have distinctions TP.
-observable_X = SparsePauliOp(["XXXXIIIIIIII"], [1])
+observable_X = SparsePauliOp(["IIIIXXXXIIII"], [1])
 observable_X_TP = SparsePauliOp(["XXXX"], [1])
 
 observables = [observable_X]
